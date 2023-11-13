@@ -127,6 +127,9 @@ class InputSourceApp extends Applet.IconApplet {
                Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(this.displays[this.displays.length-1], readInputs) );
             }
          }
+         if (this.displays.length === 0) {
+            this.updateMenu(); // Show no monitors were found in the menu
+         }
       } else {
          // ddcutil returned an error code
          this.exitCode = exitCode;
