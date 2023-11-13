@@ -23,11 +23,24 @@ const Main = imports.ui.main;
 const Util = imports.misc.util;
 const SignalManager = imports.misc.signalManager;
 const St = imports.gi.St;
+const GLib = imports.gi.GLib;
+const Gettext = imports.gettext;
+
+const UUID = "MonitorInputSource@klangman";
+
+Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
+
+function _(text) {
+  let locText = Gettext.dgettext(UUID, text);
+  if (locText == text) {
+    locText = window._(text);
+  }
+  return locText;
+}
 
 let app = null;
 
 function readInputs(stdout, stderr, exitCode) {
-   log( `Looking for inputs for display ${this.number} ec:${exitCode} ...` );
    if (exitCode===0) {
       // Read the stdout lines looking for "Feature: 60"
       let lines = stdout.split('\n');
@@ -39,17 +52,19 @@ function readInputs(stdout, stderr, exitCode) {
                this.inputs.push( parseInt(lines[i], 16 ) );
                this.inputNames.push( lines[i].slice(lines[i].indexOf(": ")+2) );
             }
-            Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.number + " getvcp 60", Lang.bind(this, readCurrentInput) );
+            // No point unless we can detect when the current input has been changed my means other then through this applet
+            //Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.number + " getvcp 60", Lang.bind(this, readCurrentInput) );
             break;
          }
       }
       //log( `Display ${this.number} ${this.name}` );
       //log( `Inputs found: ${this.inputs}` );
       //log( `Input names: ${this.inputNames}` );
-      app.updateMenu();
    } else {
       // ddcutil returned an error code
+      this.exitCode=exitCode;
    }
+   app.updateMenu();
 }
 
 function readCurrentInput(stdout, stderr, exitCode) {
@@ -77,23 +92,28 @@ class InputSourceApp extends Applet.IconApplet {
       this.menuManager.addMenu(this.menu);
 
       this.displays = [];
+      this.exitCode = 0;
       app = this;
    }
 
    on_applet_added_to_panel() {
-      log( "on_applet_added_to_panel" );
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
-      this._signalManager.connect(Main.layoutManager, "monitors-changed", this._monitorsChanged, this);
+      // Add a "detecting" menu item in case the detecting phase take a long time when using pre version 2.0 ddcutil
+      let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      item.actor.set_reactive(false);
+      this.menu.addMenuItem(item);
+      // An attempt to detect monitor changes (doesn't work the way I need)
+      //this._signalManager.connect(Main.layoutManager, "monitors-changed", this._monitorsChanged, this);
    }
 
    on_applet_clicked() {
      this.menu.toggle();
    }
 
-   _monitorsChanged() {
-      log( "Monitors changed!" );
+   //_monitorsChanged() {
+   //   log( "Monitors changed!" );
       //Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
-   }
+   //}
 
    // Call back routine that gets the output for "ddcutil detect"
    _readDisplays(stdout, stderr, exitCode) {
@@ -101,7 +121,6 @@ class InputSourceApp extends Applet.IconApplet {
          // Read the stdout lines looking for "Display #"
          let lines = stdout.split('\n');
          for (const i in lines) {
-            //log( `line: ${lines[i]}` );
             if (lines[i].startsWith("Display ")) {
                let displayNumber = parseInt(lines[i].charAt(8));
                this.displays.push( {number: displayNumber, name: "", currentInput: -1, inputs: [], inputNames: [], menuItems: []} );
@@ -110,46 +129,66 @@ class InputSourceApp extends Applet.IconApplet {
          }
       } else {
          // ddcutil returned an error code
+         this.exitCode = exitCode;
+         this.updateMenu(); // Show the error in the menu
       }
    }
 
    updateMenu() {
       let item;
       this.menu.removeAll();
-      log( `updating menu for ${this.displays.length} displays` );
-      for (let i=0 ; i< this.displays.length ; i++) {
-         item = new PopupMenu.PopupIconMenuItem(this.displays[i].name, "video-display-symbolic", St.IconType.SYMBOLIC);
-         item.actor.set_reactive(false);
-//         item.setInse
-         this.menu.addMenuItem(item);
-         if (i!=0) {
-            // Add a separator title
-            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-         }
-         for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
-            item = new PopupMenu.PopupMenuItem("\t" + this.displays[i].inputNames[idx] );
-            if (this.displays[i].currentInput===this.displays[i].inputs[idx]) {
-               //item.setShowDot(true);
-            }
-            this.displays[i].menuItems.push(item);
-            item.connect("activate", Lang.bind(this, function(/*menuitem, state*/)
-               {
-                  //log( `menu item toggled! ${state}, ${i}, ${idx}` );
-                  log( "clicked" );
-                  //if (state) {
-                     Util.spawnCommandLine( "ddcutil -d " + this.displays[i].number + " setvcp 60 0x" + this.displays[i].inputs[idx].toString(16));
-                     for (let ii=0 ; ii < this.displays[i].inputs.length ; ii++) {
-                        //this.displays[i].menuItems[ii].setShowDot((ii === idx));
-                     }
-                  //} else {
-                     // You can't toggle off
-                  //   log( `setting menu switch to true for ${idx}` );
-                  //   this.displays[i].menuItems[idx].setShowDot(true);
-                  //}
-               }));
+      if (this.displays.length === 0) {
+         if (this.exitCode == 127) {
+            item = new PopupMenu.PopupIconMenuItem(_("Required \"ddcutil\" not found"), "emblem-important", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
+            this.menu.addMenuItem(item);
+         } else if (this.exitCode != 0) {
+            item = new PopupMenu.PopupIconMenuItem(_("Error, \"ddcutil\" exit code ") + this.exitCode, "emblem-important", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
+            this.menu.addMenuItem(item);
+         } else {
+            item = new PopupMenu.PopupIconMenuItem(_("No capable monitors detected"), "emblem-important", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
             this.menu.addMenuItem(item);
          }
+      } else {
+         for (let i=0 ; i<this.displays.length ; i++) {
+            item = new PopupMenu.PopupIconMenuItem(this.displays[i].name, "video-display-symbolic", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
+            this.menu.addMenuItem(item);
+            if (i!=0) {
+               // Add a separator
+               this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            }
+            for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
+               item = new PopupMenu.PopupMenuItem("\t" + this.displays[i].inputNames[idx] );
+               if (this.displays[i].currentInput===this.displays[i].inputs[idx]) {
+                  //item.setShowDot(true);
+               }
+               this.displays[i].menuItems.push(item);
+               item.connect("activate", Lang.bind(this, function()
+                  {
+                     Util.spawnCommandLine( "ddcutil -d " + this.displays[i].number + " setvcp 60 0x" + this.displays[i].inputs[idx].toString(16));
+                  }));
+               this.menu.addMenuItem(item);
+            }
+         }
       }
+      // Add a separator
+      this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+      // Add a "Refresh" menu item
+      item = new PopupMenu.PopupIconMenuItem(_("Refresh"), "view-refresh", St.IconType.SYMBOLIC);
+      item.connect("activate", Lang.bind(this, function() 
+         {
+            this.displays = [];
+            // Add a "detecting" menu item in case the detecting phase take a long time when using pre version 2.0 ddcutil
+            this.menu.removeAll();
+            item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
+            this.menu.addMenuItem(item);
+            Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
+         }));
+      this.menu.addMenuItem(item);
    }
 }
 
