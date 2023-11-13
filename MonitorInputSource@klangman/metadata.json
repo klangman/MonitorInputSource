@@ -1,0 +1,8 @@
+{
+   "uuid": "MonitorInputSource@klangman",
+   "name": "Monitor Input Source",
+   "description": "Change monitor video input source",
+   "max-instances": "1",
+   "author": "klangman",
+   "hide-configuration": true
+}
