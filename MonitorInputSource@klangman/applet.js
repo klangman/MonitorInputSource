@@ -52,14 +52,13 @@ function readInputs(stdout, stderr, exitCode) {
                this.inputs.push( parseInt(lines[i], 16 ) );
                this.inputNames.push( lines[i].slice(lines[i].indexOf(": ")+2) );
             }
-            // No point unless we can detect when the current input has been changed my means other then through this applet
+            app.displays.push( this );
+            // Get the current input
             //Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.number + " getvcp 60", Lang.bind(this, readCurrentInput) );
             break;
          }
       }
-      //log( `Display ${this.number} ${this.name}` );
-      //log( `Inputs found: ${this.inputs}` );
-      //log( `Input names: ${this.inputNames}` );
+      //log( `Display ${this.number} ${this.name} inputs=${this.inputs} names=${this.inputNames}` );
    } else {
       // ddcutil returned an error code
       this.exitCode=exitCode;
@@ -68,14 +67,18 @@ function readInputs(stdout, stderr, exitCode) {
 }
 
 function readCurrentInput(stdout, stderr, exitCode) {
-   log( `Looking for current input of display ${this.number} ec:${exitCode} ...` );
    if (exitCode===0) {
       // Read the stdout line and extract the hex value after the "="
       this.currentInput = parseInt(stdout.slice(stdout.indexOf("=")+1));
-      app.updateMenu();
+      // If there is an existing menu item then update the item with the default icon
+      //let inputIdx = this.inputs.indexOf(this.currentInput);
+      //if (inputIdx >= 0 && this.menuItems.length > inputIdx && this.menuItems[inputIdx] != null) {
+      //   this.menuItems[inputIdx].addActor(new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC }));
+      //} else {
+         app.updateMenu();
+      //}
    } else {
-      // ddcutil returned an error code
-      this.exitCode=exitCode;
+      // ddcutil returned an error code, but we will ignore it.
    }
 }
 
@@ -98,33 +101,30 @@ class InputSourceApp extends Applet.IconApplet {
 
    on_applet_added_to_panel() {
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
-      // Add a "detecting" menu item in case the detecting phase take a long time when using pre version 2.0 ddcutil
+      // Add a "detecting" menu item in case the detecting phase take a long time
       let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
       item.actor.set_reactive(false);
       this.menu.addMenuItem(item);
-      // An attempt to detect monitor changes (doesn't work the way I need)
-      //this._signalManager.connect(Main.layoutManager, "monitors-changed", this._monitorsChanged, this);
    }
 
    on_applet_clicked() {
      this.menu.toggle();
+     //for (let i=0 ; i < this.displays.length ; i++) {
+     //   Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[i].number + " getvcp 60", Lang.bind(this.displays[i], readCurrentInput) );
+     //}
    }
 
-   //_monitorsChanged() {
-   //   log( "Monitors changed!" );
-      //Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
-   //}
 
    // Call back routine that gets the output for "ddcutil detect"
    _readDisplays(stdout, stderr, exitCode) {
       if (exitCode===0) {
          // Read the stdout lines looking for "Display #"
          let lines = stdout.split('\n');
-         for (const i in lines) {
+         for (let i in lines) {
             if (lines[i].startsWith("Display ")) {
                let displayNumber = parseInt(lines[i].charAt(8));
-               this.displays.push( {number: displayNumber, name: "", currentInput: -1, inputs: [], inputNames: [], menuItems: []} );
-               Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(this.displays[this.displays.length-1], readInputs) );
+               let display = {number: displayNumber, name: "", currentInput: -1, inputs: [], inputNames: [], menuItems: []};
+               Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(display, readInputs) );
             }
          }
          if (this.displays.length === 0) {
@@ -156,18 +156,19 @@ class InputSourceApp extends Applet.IconApplet {
          }
       } else {
          for (let i=0 ; i<this.displays.length ; i++) {
-            item = new PopupMenu.PopupIconMenuItem(this.displays[i].name, "video-display-symbolic", St.IconType.SYMBOLIC);
-            item.actor.set_reactive(false);
-            this.menu.addMenuItem(item);
             if (i!=0) {
                // Add a separator
                this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             }
+            item = new PopupMenu.PopupIconMenuItem(this.displays[i].name, "video-display-symbolic", St.IconType.SYMBOLIC);
+            item.actor.set_reactive(false);
+            this.menu.addMenuItem(item);
             for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
-               item = new PopupMenu.PopupMenuItem("\t" + this.displays[i].inputNames[idx] );
-               if (this.displays[i].currentInput===this.displays[i].inputs[idx]) {
-                  //item.setShowDot(true);
-               }
+               item = new PopupMenu.PopupMenuItem("\t" + this.displays[i].inputNames[idx]);
+               // Would need to use a PopupIconMenuItem here to allow the emblem-default icon to show up correctly at the end of the label
+               //if (this.displays[i].currentInput === this.displays[i].inputs[idx]) {
+               //   item.addActor(new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC }));
+               //}
                this.displays[i].menuItems.push(item);
                item.connect("activate", Lang.bind(this, function()
                   {
@@ -184,7 +185,7 @@ class InputSourceApp extends Applet.IconApplet {
       item.connect("activate", Lang.bind(this, function() 
          {
             this.displays = [];
-            // Add a "detecting" menu item in case the detecting phase take a long time when using pre version 2.0 ddcutil
+            // Add a "detecting" menu item in case the detecting phase take a long time
             this.menu.removeAll();
             item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
             item.actor.set_reactive(false);
