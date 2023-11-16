@@ -17,6 +17,7 @@
 */
 
 const Applet = imports.ui.applet;
+const Settings = imports.ui.settings;
 const PopupMenu = imports.ui.popupMenu;
 const Lang = imports.lang;
 const Main = imports.ui.main;
@@ -40,29 +41,44 @@ function _(text) {
 
 let app = null;
 
-function readInputs(stdout, stderr, exitCode) {
+function readDisplay(stdout, stderr, exitCode) {
    if (exitCode===0) {
       // Read the stdout lines looking for "Feature: 60"
       let lines = stdout.split('\n');
       for (let i=0 ; i < lines.length ; i++) {
          if (lines[i].startsWith("Model:")) {
             this.name = lines[i].slice(7);
-         }else if (lines[i].includes("Feature: 60") && i+1 < lines.length && lines[i+1].includes("Values:")) {
+         } else if (lines[i].includes("Feature: 60") && i+1 < lines.length && lines[i+1].includes("Values:")) {
             for ( i=i+2 ; i<lines.length && !lines[i].includes("Feature:") ; i++ ) {
                this.inputs.push( parseInt(lines[i], 16 ) );
                this.inputNames.push( lines[i].slice(lines[i].indexOf(": ")+2) );
             }
-            app.displays.push( this );
             // Get the current input
             //Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.number + " getvcp 60", Lang.bind(this, readCurrentInput) );
+            this.initilized = true;
             break;
          }
       }
-      //log( `Display ${this.number} ${this.name} inputs=${this.inputs} names=${this.inputNames}` );
+      log( `Display ${this.number} ${this.name} ${this.serialNum} ${this.productCode} inputs=${this.inputs} names=${this.inputNames}` );
+
+      // Save this monitor in the persistent cache
+      let monitorCache = app.settings.getValue("monitor-cache");
+      let cacheEntry = {name: this.name, serialNum: this.serialNum, productCode: this.productCode, inputs: this.inputs, inputNames: this.inputNames};
+      monitorCache.push(cacheEntry);
+      app.settings.setValue("monitor-cache", monitorCache);
+
+      // To avoid errors when running commands asynchronously, we only run the next command now, after this one has ends
+      for (let i=0 ; i < app.displays.length ; i++) {
+         if (app.displays[i].initilized === false) {
+            Util.spawnCommandLineAsyncIO( "ddcutil -d " + app.displays[i].number + " capabilities", Lang.bind(app.displays[i], readDisplay) );
+            return;
+         }
+      }
    } else {
       // ddcutil returned an error code
       this.exitCode=exitCode;
    }
+   // Now that all uninitilized displays have been read, we can update the menu!
    app.updateMenu();
 }
 
@@ -93,6 +109,7 @@ class InputSourceApp extends Applet.IconApplet {
       this.menu = new Applet.AppletPopupMenu(this, orientation);
       this.menuManager = new PopupMenu.PopupMenuManager(this);
       this.menuManager.addMenu(this.menu);
+      this.settings = new Settings.AppletSettings(this, UUID, instanceId);
 
       this.displays = [];
       this.exitCode = 0;
@@ -109,8 +126,8 @@ class InputSourceApp extends Applet.IconApplet {
 
    on_applet_clicked() {
      this.menu.toggle();
-     //for (let i=0 ; i < this.displays.length ; i++) {
-     //   Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[i].number + " getvcp 60", Lang.bind(this.displays[i], readCurrentInput) );
+     //if (this.displays.length>0) {
+     //   Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[i].number + " getvcp 60", Lang.bind(this.displays[0], readCurrentInput) );
      //}
    }
 
@@ -120,15 +137,50 @@ class InputSourceApp extends Applet.IconApplet {
       if (exitCode===0) {
          // Read the stdout lines looking for "Display #"
          let lines = stdout.split('\n');
+         let display;
+         let displayNumber;
          for (let i in lines) {
             if (lines[i].startsWith("Display ")) {
-               let displayNumber = parseInt(lines[i].charAt(8));
-               let display = {number: displayNumber, name: "", currentInput: -1, inputs: [], inputNames: [], menuItems: []};
-               Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(display, readInputs) );
+               displayNumber = parseInt(lines[i].charAt(8));
+               display = {number: displayNumber, name: "", serialNum: -1, productCode: -1, currentInput: -1, initilized: false, inputs: [], inputNames: [], menuItems: []};
+               this.displays.push( display );
+               //Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(display, readDisplay) );
+            } else if (lines[i].includes("Binary serial number:") && display) {
+               display.serialNum = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
+            } else if (lines[i].includes("Product code:") && display) {
+               display.productCode = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
             }
          }
          if (this.displays.length === 0) {
             this.updateMenu(); // Show no monitors were found in the menu
+         } else {
+            // Check if any of the displays have been cached
+            let monitorCache = this.settings.getValue("monitor-cache");
+            let firstUnknownDisplay = null;
+            for (let i=0 ; i < this.displays.length ; i++) {
+               let idx=0;
+               for ( ; idx < monitorCache.length ; idx++) {
+                  if (monitorCache[idx].serialNum == this.displays[i].serialNum && monitorCache[idx].productCode == this.displays[i].productCode) {
+                     // Load the display settings from the persistent cache
+                     log( `Loading monitor from cache ${monitorCache[idx].name}` );
+                     this.displays.initilized = true;
+                     this.displays[i].name = monitorCache[idx].name;
+                     this.displays[i].inputs = monitorCache[idx].inputs;
+                     this.displays[i].inputNames = monitorCache[idx].inputNames;
+                     break;
+                  }
+               }
+               if (idx === monitorCache.length && firstUnknownDisplay===null) {
+                  firstUnknownDisplay = this.displays[0];
+               }
+            }
+            // If there are any unknown monitors, then read the details now
+            if (firstUnknownDisplay) {
+               Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[0].number + " capabilities", Lang.bind(firstUnknownDisplay, readDisplay) );
+            } else {
+               // There are no unknown monitors so we can update the menu now
+               this.updateMenu();
+            }
          }
       } else {
          // ddcutil returned an error code
@@ -185,7 +237,7 @@ class InputSourceApp extends Applet.IconApplet {
       item.connect("activate", Lang.bind(this, function() 
          {
             this.displays = [];
-            // Add a "detecting" menu item in case the detecting phase take a long time
+            // Add a "detecting" menu item in case the detecting phase takes a long time
             this.menu.removeAll();
             item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
             item.actor.set_reactive(false);

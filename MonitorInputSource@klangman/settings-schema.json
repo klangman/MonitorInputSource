@@ -1,0 +1,6 @@
+{
+   "monitor-cache": {
+      "type": "generic",
+      "default": []
+   }
+}
