@@ -59,7 +59,7 @@ function readDisplay(stdout, stderr, exitCode) {
             break;
          }
       }
-      log( `Display ${this.number} ${this.name} ${this.serialNum} ${this.productCode} inputs=${this.inputs} names=${this.inputNames}` );
+      //log( `Display ${this.number} ${this.name} ${this.serialNum} ${this.productCode} inputs=${this.inputs} names=${this.inputNames}` );
 
       // Save this monitor in the persistent cache
       let monitorCache = app.settings.getValue("monitor-cache");
@@ -105,7 +105,7 @@ class InputSourceApp extends Applet.IconApplet {
       super(orientation, panelHeight, instanceId);
       this._signalManager = new SignalManager.SignalManager(null);
       this.set_applet_icon_symbolic_name("video-display-symbolic");
-      this.set_applet_tooltip("Select monitor input source");
+      this.set_applet_tooltip("Monitor input sources");
       this.menu = new Applet.AppletPopupMenu(this, orientation);
       this.menuManager = new PopupMenu.PopupMenuManager(this);
       this.menuManager.addMenu(this.menu);
@@ -162,7 +162,7 @@ class InputSourceApp extends Applet.IconApplet {
                for ( ; idx < monitorCache.length ; idx++) {
                   if (monitorCache[idx].serialNum == this.displays[i].serialNum && monitorCache[idx].productCode == this.displays[i].productCode) {
                      // Load the display settings from the persistent cache
-                     log( `Loading monitor from cache ${monitorCache[idx].name}` );
+                     //log( `Loading monitor from cache ${monitorCache[idx].name}` );
                      this.displays.initilized = true;
                      this.displays[i].name = monitorCache[idx].name;
                      this.displays[i].inputs = monitorCache[idx].inputs;
