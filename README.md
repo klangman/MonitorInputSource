@@ -1,6 +1,8 @@
 # Monitor Input Source
 A cinnamon applet that allows you to change the input source for your monitors.
 
+![screen shot](MonitorInputSource@klangman/screenshot.png)
+
 Perfect for people who have two computers connected to different input sources on a monitor
 
 This applet uses [ddcutil](https://www.ddcutil.com/) to communicate with your monitor and send commands
