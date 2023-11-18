@@ -37,11 +37,23 @@ or build from the source:
 
 https://www.ddcutil.com/building/
 
+Once properly setup you should see information about your monitor(s) when running this command:
+
+```
+ddcutil detect
+```
+
+If you get errors running that command, you might get some clues about what is wrong by running:
+
+```
+ddcutil environment
+```
+
 ## Installation
 For the latest development version:
 1. Clone the repo (or Download the latest repo by clinking on the green "code" button above then click "Download ZIP")
     ```
-    git clone git@github.com:klangman/MonitorInputSource.git
+    git clone https://github.com/klangman/MonitorInputSource.git
     ```
 2. If you downloaded a ZIP, decompress the zip into a directory of your choice
     ```

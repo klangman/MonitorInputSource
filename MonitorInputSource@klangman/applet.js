@@ -149,6 +149,8 @@ class InputSourceApp extends Applet.IconApplet {
                display.serialNum = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
             } else if (lines[i].includes("Product code:") && display) {
                display.productCode = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
+            } else if (lines[i].startsWith("Invalid display") && display) {
+               display = null;
             }
          }
          if (this.displays.length === 0) {
