@@ -53,8 +53,6 @@ function readDisplay(stdout, stderr, exitCode) {
                this.inputs.push( parseInt(lines[i], 16 ) );
                this.inputNames.push( lines[i].slice(lines[i].indexOf(": ")+2) );
             }
-            // Get the current input
-            //Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.number + " getvcp 60", Lang.bind(this, readCurrentInput) );
             this.initilized = true;
             break;
          }
@@ -87,14 +85,18 @@ function readCurrentInput(stdout, stderr, exitCode) {
       // Read the stdout line and extract the hex value after the "="
       this.currentInput = parseInt(stdout.slice(stdout.indexOf("=")+1));
       // If there is an existing menu item then update the item with the default icon
-      //let inputIdx = this.inputs.indexOf(this.currentInput);
-      //if (inputIdx >= 0 && this.menuItems.length > inputIdx && this.menuItems[inputIdx] != null) {
-      //   this.menuItems[inputIdx].addActor(new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC }));
-      //} else {
-         app.updateMenu();
-      //}
+      let inputIdx = this.inputs.indexOf(this.currentInput);
+      let menuItem = app.getMenuItemForDisplayInput(this, this.currentInput);
+      if (menuItem) {
+         menuItem.setInputActive(true);
+      }
    } else {
       // ddcutil returned an error code, but we will ignore it.
+   }
+   // Query the next monitor's current input since we can get errors when run concurrently
+   let idx = app.displays.indexOf(this)+1;
+   if (idx < app.displays.length) {
+      Util.spawnCommandLineAsyncIO( "ddcutil -d " + app.displays[idx].number + " getvcp 60", Lang.bind(this.displays[idx], readCurrentInput) );
    }
 }
 
@@ -117,6 +119,7 @@ class InputSourceApp extends Applet.IconApplet {
    }
 
    on_applet_added_to_panel() {
+      // Get a list of all the displays
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
       // Add a "detecting" menu item in case the detecting phase take a long time
       let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
@@ -125,10 +128,18 @@ class InputSourceApp extends Applet.IconApplet {
    }
 
    on_applet_clicked() {
-     this.menu.toggle();
-     //if (this.displays.length>0) {
-     //   Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[i].number + " getvcp 60", Lang.bind(this.displays[0], readCurrentInput) );
-     //}
+      if (!this.menu.isOpen && this.displays.length>0) {
+         let items = this.menu._getMenuItems();
+         // Remove all the "current input" check from all menu items
+         for (let i=0 ; i < items.length ; i++) {
+            if (items[i] instanceof InputMenuItem) {
+               items[i].setInputActive(false);
+            }
+         }
+         // Read the "current input" for all displays
+         Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.displays[0].number + " getvcp 60", Lang.bind(this.displays[0], readCurrentInput) );
+      }
+      this.menu.toggle();
    }
 
 
@@ -144,7 +155,6 @@ class InputSourceApp extends Applet.IconApplet {
                displayNumber = parseInt(lines[i].charAt(8));
                display = {number: displayNumber, name: "", serialNum: -1, productCode: -1, currentInput: -1, initilized: false, inputs: [], inputNames: [], menuItems: []};
                this.displays.push( display );
-               //Util.spawnCommandLineAsyncIO( "ddcutil -d " + displayNumber + " capabilities", Lang.bind(display, readDisplay) );
             } else if (lines[i].includes("Binary serial number:") && display) {
                display.serialNum = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
             } else if (lines[i].includes("Product code:") && display) {
@@ -191,6 +201,16 @@ class InputSourceApp extends Applet.IconApplet {
       }
    }
 
+   getMenuItemForDisplayInput(display, input) {
+      let items = this.menu._getMenuItems();
+      for (let i=0 ; i < items.length ; i++) {
+         if (items[i] instanceof InputMenuItem && items[i].getDisplay() === display && items[1].getInput() === input) {
+            return items[i];
+         }
+      }
+      return null;
+   }
+
    updateMenu() {
       let item;
       this.menu.removeAll();
@@ -218,11 +238,7 @@ class InputSourceApp extends Applet.IconApplet {
             item.actor.set_reactive(false);
             this.menu.addMenuItem(item);
             for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
-               item = new PopupMenu.PopupMenuItem("\t" + this.displays[i].inputNames[idx]);
-               // Would need to use a PopupIconMenuItem here to allow the emblem-default icon to show up correctly at the end of the label
-               //if (this.displays[i].currentInput === this.displays[i].inputs[idx]) {
-               //   item.addActor(new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC }));
-               //}
+               item = new InputMenuItem(this.displays[i], idx);
                this.displays[i].menuItems.push(item);
                item.connect("activate", Lang.bind(this, function()
                   {
@@ -247,6 +263,40 @@ class InputSourceApp extends Applet.IconApplet {
             Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
          }));
       this.menu.addMenuItem(item);
+   }
+}
+
+class InputMenuItem extends PopupMenu.PopupMenuItem {
+   _init (display, inputIdx, params) {
+      super._init.call(this, "\t" + display.inputNames[inputIdx], params);
+      this._display = display;
+      this._inputIdx = inputIdx;
+      this._currentIcon = new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC, width: 32 });
+      this.addActor(this._currentIcon);
+   }
+
+   getDisplay() {
+      return this._display;
+   }
+
+   getInputIdx() {
+      return this.inputIdx;
+   }
+
+   getInput() {
+      return this._display.inputs[this._inputIdx];
+   }
+
+   getInputName() {
+      return this._display.inputNames[this._inputIdx];
+   }
+
+   setInputActive(state) {
+      if (state) {
+         this._currentIcon.show();
+      } else {
+         this._currentIcon.hide();
+      }
    }
 }
 
