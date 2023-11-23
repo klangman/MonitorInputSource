@@ -29,6 +29,12 @@ const Gettext = imports.gettext;
 
 const UUID = "MonitorInputSource@klangman";
 
+const Modifier = {
+   None: 0,
+   Shift: 0x10,
+   Ctrl: 0x20
+}
+
 Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
 
 function _(text) {
@@ -40,6 +46,44 @@ function _(text) {
 }
 
 let app = null;
+
+function getActionName(actionCode) {
+   let name = "";
+   if ((actionCode&Modifier.Ctrl) == Modifier.Ctrl) {
+      name += "Ctrl+";
+   }
+   if ((actionCode&Modifier.Shift) == Modifier.Shift) {
+      name += "Shift+";
+   }
+   let button = (actionCode&0xf);
+   if (button == 1) {
+      name += "Left Click";
+   } else if (button == 2) {
+      name += "Middle Click";
+   } else if (button == 3) {
+      name += "Right Click";
+   } else if (button == 8) {
+      name += "Back Click";
+   } else if (button == 9) {
+      name += "Forward Click";
+   }
+   return name;
+}
+
+function getActionCode(event) {
+   let modifiers = Modifier.None;
+   let button = event.get_button();
+   if (event.has_control_modifier()) {
+      modifiers |= Modifier.Ctrl;
+   }
+   if (event.has_shift_modifier()) {
+      modifiers |= Modifier.Shift;
+   }
+   if (modifiers != Modifier.None || (button != 1 && button != 3)) {
+      return modifiers | button;
+   }
+   return 0;
+}
 
 function readDisplay(stdout, stderr, exitCode) {
    if (exitCode===0) {
@@ -82,13 +126,19 @@ function readDisplay(stdout, stderr, exitCode) {
 
 function readCurrentInput(stdout, stderr, exitCode) {
    if (exitCode===0) {
-      // Read the stdout line and extract the hex value after the "="
-      this.currentInput = parseInt(stdout.slice(stdout.indexOf("=")+1));
-      // If there is an existing menu item then update the item with the default icon
-      let inputIdx = this.inputs.indexOf(this.currentInput);
-      let menuItem = app.getMenuItemForDisplayInput(this, this.currentInput);
-      if (menuItem) {
-         menuItem.setInputActive(true);
+      let lines = stdout.split('\n');
+      for (let i=0 ; i < lines.length ; i++) {
+         if (lines[i].startsWith("VCP code 0x60")) {
+            // Read the stdout line and extract the hex value after the "="
+            this.currentInput = parseInt(lines[i].slice(lines[i].indexOf("=")+1));
+            // If there is an existing menu item then update the item with the default icon
+            let inputIdx = this.inputs.indexOf(this.currentInput);
+            let menuItem = app.getMenuItemForDisplayInput(this, this.currentInput);
+            if (menuItem) {
+               menuItem.setInputActive(true);
+            }
+            break;
+         }
       }
    } else {
       // ddcutil returned an error code, but we will ignore it.
@@ -96,7 +146,7 @@ function readCurrentInput(stdout, stderr, exitCode) {
    // Query the next monitor's current input since we can get errors when run concurrently
    let idx = app.displays.indexOf(this)+1;
    if (idx < app.displays.length) {
-      Util.spawnCommandLineAsyncIO( "ddcutil -d " + app.displays[idx].number + " getvcp 60", Lang.bind(this.displays[idx], readCurrentInput) );
+      Util.spawnCommandLineAsyncIO( "ddcutil -d " + app.displays[idx].number + " getvcp 60", Lang.bind(app.displays[idx], readCurrentInput) );
    }
 }
 
@@ -119,12 +169,26 @@ class InputSourceApp extends Applet.IconApplet {
    }
 
    on_applet_added_to_panel() {
-      // Get a list of all the displays
-      Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
       // Add a "detecting" menu item in case the detecting phase take a long time
       let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
       item.actor.set_reactive(false);
       this.menu.addMenuItem(item);
+      // Get a list of all the displays
+      Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
+   }
+
+   _onButtonPressEvent(actor, event) {
+      let action = getActionCode(event);
+      if (action) {
+         let items = this.menu._getMenuItems();
+         for (let i=0 ; i < items.length ; i++) {
+            if (items[i] instanceof InputMenuItem && items[i].actionCode == action) {
+               Util.spawnCommandLine( "ddcutil -d " + items[i].getDisplay().number + " setvcp 60 0x" + items[i].getInput().toString(16));
+               return;
+            }
+         }
+      }
+      super._onButtonPressEvent(actor, event);
    }
 
    on_applet_clicked() {
@@ -141,7 +205,6 @@ class InputSourceApp extends Applet.IconApplet {
       }
       this.menu.toggle();
    }
-
 
    // Call back routine that gets the output for "ddcutil detect"
    _readDisplays(stdout, stderr, exitCode) {
@@ -204,7 +267,7 @@ class InputSourceApp extends Applet.IconApplet {
    getMenuItemForDisplayInput(display, input) {
       let items = this.menu._getMenuItems();
       for (let i=0 ; i < items.length ; i++) {
-         if (items[i] instanceof InputMenuItem && items[i].getDisplay() === display && items[1].getInput() === input) {
+         if (items[i] instanceof InputMenuItem && items[i].getDisplay() === display && items[i].getInput() === input) {
             return items[i];
          }
       }
@@ -250,9 +313,33 @@ class InputSourceApp extends Applet.IconApplet {
       }
       // Add a separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+      // Set a setting submenu
+      let subMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
+      this.menu.addMenuItem(subMenu);
+      item = new PopupMenu.PopupMenuItem(_("Clear monitors cache"));
+      item.connect("activate", Lang.bind(this, function()
+         {
+            this.settings.setValue("monitor-cache", []);
+         }));
+      subMenu.menu.addMenuItem(item);
+      item = new PopupMenu.PopupMenuItem(_("Clear quick actions"));
+      item.connect("activate", Lang.bind(this, function()
+         {
+            this.settings.setValue("mouse-actions", []);
+            let items = this.menu._getMenuItems();
+            for (let i=0 ; i < items.length ; i++) {
+               if (items[i] instanceof InputMenuItem) {
+                  items[i].actionCode =0;
+               }
+            }
+            this.updateToolTip();
+         }));
+      subMenu.menu.addMenuItem(item);
+      // Add a separator
+      this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
       // Add a "Refresh" menu item
       item = new PopupMenu.PopupIconMenuItem(_("Refresh"), "view-refresh", St.IconType.SYMBOLIC);
-      item.connect("activate", Lang.bind(this, function() 
+      item.connect("activate", Lang.bind(this, function()
          {
             this.displays = [];
             // Add a "detecting" menu item in case the detecting phase takes a long time
@@ -263,6 +350,25 @@ class InputSourceApp extends Applet.IconApplet {
             Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
          }));
       this.menu.addMenuItem(item);
+      this.updateToolTip();
+   }
+
+   updateToolTip() {
+      let toolTipText = "";
+      let items = this.menu._getMenuItems();
+      for (let i=0 ; i < items.length ; i++) {
+         let item = items[i];
+         if (item instanceof InputMenuItem && item.actionCode != 0) {
+            let display = item.getDisplay();
+            toolTipText += "\n"+ getActionName(item.actionCode) + " for " + display.name + ":" + item.getInputName();
+         }
+      }
+      if (toolTipText.length>0) {
+         toolTipText = "<b>Monitor input sources</b>" + toolTipText;
+      } else {
+         toolTipText = "Monitor input sources"
+      }
+      this.set_applet_tooltip(toolTipText, true);
    }
 }
 
@@ -273,6 +379,13 @@ class InputMenuItem extends PopupMenu.PopupMenuItem {
       this._inputIdx = inputIdx;
       this._currentIcon = new St.Icon({ style_class: 'popup-menu-icon', icon_name: 'emblem-default', icon_type: St.IconType.SYMBOLIC, width: 32 });
       this.addActor(this._currentIcon);
+      this.actionCode = 0;
+      let actions = app.settings.getValue("mouse-actions");
+      for (let i=0 ; i<actions.length ; i++) {
+         if (actions[i].serialNum == display.serialNum && actions[i].productCode == display.productCode && actions[i].inputIdx == inputIdx) {
+            this.actionCode = actions[i].actionCode;
+         }
+      }
    }
 
    getDisplay() {
@@ -296,6 +409,36 @@ class InputMenuItem extends PopupMenu.PopupMenuItem {
          this._currentIcon.show();
       } else {
          this._currentIcon.hide();
+      }
+   }
+
+   _onButtonReleaseEvent(actor, event) {
+      let action = getActionCode(event);
+      if (action != 0) {
+         // Setup a mouse-action for the panel button
+         let actions = app.settings.getValue("mouse-actions");
+         // Check for an existing action for this mouse+key combination and remove it
+         for (let i=actions.length-1 ; i>=0 ; i--) {
+            if (actions[i].actionCode === action || (actions[i].serialNum == this._display.serialNum && actions[i].productCode == this._display.productCode && actions[i].inputIdx == this._inputIdx)) {
+               if (actions[i].actionCode === action) {
+                  let items = app.menu._getMenuItems();
+                  for (let i=0 ; i < items.length ; i++) {
+                     if (items[i].actionCode==action) {
+                        items[i].actionCode=0;
+                     }
+                  }
+               }
+               actions.splice(i, 1);
+            }
+         }
+         let actionEntry = {actionCode: action, serialNum: this._display.serialNum, productCode: this._display.productCode, inputIdx: this._inputIdx };
+         actions.push(actionEntry);
+         app.settings.setValue("mouse-actions", actions);
+         this.actionCode = action;
+         app.updateToolTip();
+         app.menu.close();
+      } else {
+         super._onButtonReleaseEvent(actor, event);
       }
    }
 }
