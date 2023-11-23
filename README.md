@@ -10,6 +10,22 @@ This applet uses [ddcutil](https://www.ddcutil.com/) to communicate with your mo
 that will change the current input source that the monitor is using. This allows you to quickly change the
 input source for all monitors connected to your PC.
 
+## Features
+
+1. Change the input source for each monitor attached to your PC with just 2 mouse clicks
+2. Checkmark icon on input menu items to indicate which input source is currently active
+3. Setup quick actions to switch monitor inputs with a signle click on the panel icon
+
+### How to define a Quick action
+
+Open the menu (left click).
+Click on the desired input source using one of the following mouse butttons (with or without modifier keys):
+1. Middle, Forward or Back mouse buttons
+2. Shift or Control keys and any mouse button
+3. Shift and Control keys and any mouse button
+
+Once a quick action has been defined, the tooltip text for the panel button will show all the active quick action options
+
 ## Requirements
 The [ddcutil](https://www.ddcutil.com/) package must be installed for this applet to opperate correctly. It's recommended that ddcutil 2.0
 or better is installed for optimial ease of use and performance, but older versions will work fine if you follow the instructions below.
