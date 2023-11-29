@@ -107,7 +107,7 @@ function readDisplay(stdout, stderr, exitCode) {
       monitorCache.push(cacheEntry);
       this.applet.settings.setValue("monitor-cache", monitorCache);
 
-      // To avoid errors when running commands asynchronously, we only run the next command now, after this one has ends
+      // To avoid errors when running commands asynchronously, we only run the next command now, after this one has ended
       for (let i=0 ; i < this.applet.displays.length ; i++) {
          if (this.applet.displays[i].initilized === false) {
             Util.spawnCommandLineAsyncIO( "ddcutil -d " + this.applet.displays[i].number + " capabilities", Lang.bind({applet: this.applet, display: this.applet.displays[i]}, readDisplay) );
@@ -175,7 +175,7 @@ class InputSourceApp extends Applet.IconApplet {
       // Set a setting submenu
       let subMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
       this.menu.addMenuItem(subMenu);
-      item = new PopupMenu.PopupMenuItem(_("Clear monitors cache"));
+      item = new PopupMenu.PopupMenuItem(_("Clear monitor cache"));
       item.connect("activate", Lang.bind(this, function()
          {
             this.settings.setValue("monitor-cache", []);
@@ -192,6 +192,12 @@ class InputSourceApp extends Applet.IconApplet {
                }
             }
             this.updateToolTip();
+         }));
+      subMenu.menu.addMenuItem(item);
+      item = new PopupMenu.PopupMenuItem(_("Help"));
+      item.connect("activate", Lang.bind(this, function()
+         {
+            Util.spawnCommandLineAsync("/usr/bin/xdg-open https://cinnamon-spices.linuxmint.com/applets/view/382");
          }));
       subMenu.menu.addMenuItem(item);
       // Add a separator
