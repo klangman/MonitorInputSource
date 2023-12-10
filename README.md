@@ -3,6 +3,15 @@ A cinnamon applet that allows you to change the input source your monitors are u
 
 ![screen shot](MonitorInputSource@klangman/screenshot.png)
 
+This applet is now available in the cinnamon-spices-applets repo meaning it can be found in the "Applets" tool under
+the "Download" tab from the cinnamon desktop settings and at the following URL:
+
+https://cinnamon-spices.linuxmint.com/applets/view/382
+
+If you like this applet, please go to the above link and "Like it" so that more people might learn of it's existence.
+Also, the more likes it gets the more encouragement I'll have to continue working on it.
+Thanks!
+
 Perfect for people who have two computers connected to different input sources on a monitor.
 Quicker and easier then reaching for the buttons on the monitor
 
