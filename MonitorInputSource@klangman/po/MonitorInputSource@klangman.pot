@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-11-23 21:53-0500\n"
+"POT-Creation-Date: 2023-12-17 18:32-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,35 +17,75 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: applet.js:173 applet.js:459
+#: applet.js:51
+msgid "Ctrl+"
+msgstr ""
+
+#: applet.js:54
+msgid "Shift+"
+msgstr ""
+
+#: applet.js:58
+msgid "Left Click"
+msgstr ""
+
+#: applet.js:60
+msgid "Middle Click"
+msgstr ""
+
+#: applet.js:62
+msgid "Right Click"
+msgstr ""
+
+#: applet.js:64
+msgid "Back Click"
+msgstr ""
+
+#: applet.js:66
+msgid "Forward Click"
+msgstr ""
+
+#: applet.js:158 applet.js:373 applet.js:375
+msgid "Monitor input sources"
+msgstr ""
+
+#: applet.js:170 applet.js:464
 msgid "Detecting monitors..."
 msgstr ""
 
-#: applet.js:179
+#: applet.js:176
 msgid "Options"
 msgstr ""
 
-#: applet.js:181
-msgid "Clear monitors cache"
+#: applet.js:178
+msgid "Clear monitor cache"
 msgstr ""
 
-#: applet.js:187
+#: applet.js:184
 msgid "Clear quick actions"
 msgstr ""
 
-#: applet.js:318
+#: applet.js:197
+msgid "Help"
+msgstr ""
+
+#: applet.js:321
 msgid "Required \"ddcutil\" not found"
 msgstr ""
 
-#: applet.js:322
+#: applet.js:325
 msgid "Error, \"ddcutil\" exit code "
 msgstr ""
 
-#: applet.js:326
+#: applet.js:329
 msgid "No capable monitors detected"
 msgstr ""
 
-#: applet.js:451
+#: applet.js:369
+msgid "for"
+msgstr ""
+
+#: applet.js:456
 msgid "Refresh"
 msgstr ""
 
@@ -54,5 +94,6 @@ msgid "Monitor Input Source"
 msgstr ""
 
 #. metadata.json->description
-msgid "Change monitor video input source"
+msgid ""
+"Change your monitors video input source directly from the cinnamon panel"
 msgstr ""
