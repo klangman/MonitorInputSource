@@ -36,14 +36,14 @@ Click on the desired input source using one of the following mouse butttons (wit
 Once a quick action has been defined, the tooltip text for the panel button will show all the active quick action options
 
 ## Requirements
-The [ddcutil](https://www.ddcutil.com/) package must be installed for this applet to opperate correctly. It's recommended that ddcutil 2.0
+The [ddcutil](https://www.ddcutil.com/) package must be installed for this applet to operate correctly. It's recommended that ddcutil 2.0
 or better is installed for optimial ease of use and performance, but older versions will work fine if you follow the instructions below.
 
 ```
 sudo apt-get install ddcutil
 ```
 
-If your package respsitory does not currently offer ddcutil 2.0 or better (i.e. Linux Mint 21.2 at the moment)
+If your package repository does not currently offer ddcutil 2.0 or better (i.e. Linux Mint 21.2 at the moment)
 then you will need to add your user to the i2c group and then logout and back in again for the change to take
 effect:
 ```

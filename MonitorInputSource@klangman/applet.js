@@ -207,6 +207,18 @@ class InputSourceApp extends Applet.IconApplet {
       this.menu.addMenuItem(item);
       // Get a list of all the displays
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
+      this._signalManager.connect(Main.layoutManager, "monitors-changed", this._updateMonitors, this);
+   }
+
+   _updateMonitors() {
+      // There might be new monitors now, so refresh the list of monitors
+      this.displays = [];
+      // Add a "detecting" menu item in case the detecting phase takes a long time
+      this.removeDisplayMenuItems();
+      let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      item.actor.set_reactive(false);
+      this.menu.addMenuItem(item,0);
+      Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
    }
 
    _onButtonPressEvent(actor, event) {
