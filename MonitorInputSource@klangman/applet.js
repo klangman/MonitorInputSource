@@ -167,7 +167,7 @@ class InputSourceApp extends Applet.IconApplet {
 
    on_applet_added_to_panel() {
       // Add a "detecting" menu item in case the detecting phase take a long time
-      let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic");
       item.actor.set_reactive(false);
       this.menu.addMenuItem(item);
       // Add a separator
@@ -211,11 +211,12 @@ class InputSourceApp extends Applet.IconApplet {
    }
 
    _updateMonitors() {
+      log( "New Monitors???" );
       // There might be new monitors now, so refresh the list of monitors
       this.displays = [];
       // Add a "detecting" menu item in case the detecting phase takes a long time
       this.removeDisplayMenuItems();
-      let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic");
       item.actor.set_reactive(false);
       this.menu.addMenuItem(item,0);
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this, this._readDisplays) );
@@ -320,8 +321,14 @@ class InputSourceApp extends Applet.IconApplet {
 
    removeDisplayMenuItems() {
       let items = this.menu._getMenuItems();
-      for (let i=items.length-5 ; i >= 0 ; i--) {
-         items[i].destroy();
+      for (let i=items.length-1 ; i >= 0 ; i--) {
+         // Once we hit the first InputMenuItem|InformationMenuItem remove everything above it!
+         if (items[i] instanceof InputMenuItem || items[i] instanceof InformationMenuItem) {
+            for( ; i >= 0 ; i-- ) {
+               items[i].destroy();
+            }
+            break;
+         }
       }
    }
 
@@ -330,15 +337,15 @@ class InputSourceApp extends Applet.IconApplet {
       this.removeDisplayMenuItems();
       if (this.displays.length === 0) {
          if (this.exitCode == 127) {
-            item = new PopupMenu.PopupIconMenuItem(_("Required \"ddcutil\" not found"), "emblem-important", St.IconType.SYMBOLIC);
+            item = new InformationMenuItem(_("Required \"ddcutil\" not found"), "emblem-important");
             item.actor.set_reactive(false);
             this.menu.addMenuItem(item,0);
          } else if (this.exitCode != 0) {
-            item = new PopupMenu.PopupIconMenuItem(_("Error, \"ddcutil\" exit code ") + this.exitCode, "emblem-important", St.IconType.SYMBOLIC);
+            item = new InformationMenuItem(_("Error, \"ddcutil\" exit code ") + this.exitCode, "emblem-important");
             item.actor.set_reactive(false);
             this.menu.addMenuItem(item,0);
          } else {
-            item = new PopupMenu.PopupIconMenuItem(_("No capable monitors detected"), "emblem-important", St.IconType.SYMBOLIC);
+            item = new InformationMenuItem(_("No capable monitors detected"), "emblem-important");
             item.actor.set_reactive(false);
             this.menu.addMenuItem(item,0);
          }
@@ -350,7 +357,7 @@ class InputSourceApp extends Applet.IconApplet {
                // Add a separator
                this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             }
-            item = new PopupMenu.PopupIconMenuItem(this.displays[i].name, "video-display-symbolic", St.IconType.SYMBOLIC);
+            item = new InformationMenuItem(this.displays[i].name, "video-display-symbolic");
             item.actor.set_reactive(false);
             this.menu.addMenuItem(item,pos++);
             for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
@@ -473,12 +480,19 @@ class RefreshMenuItem extends PopupMenu.PopupIconMenuItem {
       this._applet.displays = [];
       // Add a "detecting" menu item in case the detecting phase takes a long time
       this._applet.removeDisplayMenuItems();
-      let item = new PopupMenu.PopupIconMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
       item.actor.set_reactive(false);
       this._applet.menu.addMenuItem(item,0);
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this._applet, this._applet._readDisplays) );
    }
 }
+
+class InformationMenuItem extends PopupMenu.PopupIconMenuItem {
+   _init (text, icon, params) {
+      super._init.call(this, text, icon, St.IconType.SYMBOLIC, params);
+   }
+}
+
 
 // Called by cinnamon when starting this applet
 function main(metadata, orientation, panelHeight, instanceId) {
