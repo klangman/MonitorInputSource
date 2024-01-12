@@ -211,9 +211,7 @@ class InputSourceApp extends Applet.IconApplet {
    }
 
    _updateMonitors() {
-      log( "New Monitors???" );
       // There might be new monitors now, so refresh the list of monitors
-      this.displays = [];
       // Add a "detecting" menu item in case the detecting phase takes a long time
       this.removeDisplayMenuItems();
       let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic");
@@ -258,10 +256,11 @@ class InputSourceApp extends Applet.IconApplet {
          let lines = stdout.split('\n');
          let display;
          let displayNumber;
+         this.displays = [];
          for (let i in lines) {
             if (lines[i].startsWith("Display ")) {
                displayNumber = parseInt(lines[i].charAt(8));
-               display = {number: displayNumber, name: "", serialNum: -1, productCode: -1, currentInput: -1, initilized: false, inputs: [], inputNames: [], menuItems: []};
+               display = {number: displayNumber, name: "", serialNum: -1, productCode: -1, currentInput: -1, initilized: false, inputs: [], inputNames: []};
                this.displays.push( display );
             } else if (lines[i].includes("Binary serial number:") && display) {
                display.serialNum = parseInt(lines[i].slice(lines[i].indexOf(":")+1));
@@ -362,7 +361,6 @@ class InputSourceApp extends Applet.IconApplet {
             this.menu.addMenuItem(item,pos++);
             for (let idx=0 ; idx < this.displays[i].inputNames.length ; idx++ ) {
                item = new InputMenuItem(this, this.displays[i], idx);
-               this.displays[i].menuItems.push(item);
                item.connect("activate", Lang.bind(this, function()
                   {
                      Util.spawnCommandLine( "ddcutil -d " + this.displays[i].number + " setvcp 60 0x" + this.displays[i].inputs[idx].toString(16));
@@ -477,7 +475,6 @@ class RefreshMenuItem extends PopupMenu.PopupIconMenuItem {
    }
 
    _onButtonReleaseEvent(actor, event) {
-      this._applet.displays = [];
       // Add a "detecting" menu item in case the detecting phase takes a long time
       this._applet.removeDisplayMenuItems();
       let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
