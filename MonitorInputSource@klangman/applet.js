@@ -282,7 +282,7 @@ class InputSourceApp extends Applet.IconApplet {
                   if (monitorCache[idx].serialNum == this.displays[i].serialNum && monitorCache[idx].productCode == this.displays[i].productCode) {
                      // Load the display settings from the persistent cache
                      //log( `Loading monitor from cache ${monitorCache[idx].name}` );
-                     this.displays.initilized = true;
+                     this.displays[i].initilized = true;
                      this.displays[i].name = monitorCache[idx].name;
                      this.displays[i].inputs = monitorCache[idx].inputs;
                      this.displays[i].inputNames = monitorCache[idx].inputNames;
@@ -477,7 +477,7 @@ class RefreshMenuItem extends PopupMenu.PopupIconMenuItem {
    _onButtonReleaseEvent(actor, event) {
       // Add a "detecting" menu item in case the detecting phase takes a long time
       this._applet.removeDisplayMenuItems();
-      let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic", St.IconType.SYMBOLIC);
+      let item = new InformationMenuItem(_("Detecting monitors..."), "video-display-symbolic");
       item.actor.set_reactive(false);
       this._applet.menu.addMenuItem(item,0);
       Util.spawnCommandLineAsyncIO( "ddcutil detect", Lang.bind(this._applet, this._applet._readDisplays) );
@@ -489,7 +489,6 @@ class InformationMenuItem extends PopupMenu.PopupIconMenuItem {
       super._init.call(this, text, icon, St.IconType.SYMBOLIC, params);
    }
 }
-
 
 // Called by cinnamon when starting this applet
 function main(metadata, orientation, panelHeight, instanceId) {
