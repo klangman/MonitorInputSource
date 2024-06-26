@@ -154,7 +154,7 @@ class InputSourceApp extends Applet.IconApplet {
    constructor(orientation, panelHeight, instanceId) {
       super(orientation, panelHeight, instanceId);
       this._signalManager = new SignalManager.SignalManager(null);
-      this.set_applet_icon_symbolic_name("video-display-symbolic");
+      this.set_applet_icon_symbolic_name("video-display-input-symbolic");
       this.set_applet_tooltip(_("Monitor input sources"));
       this.menu = new Applet.AppletPopupMenu(this, orientation);
       this.menuManager = new PopupMenu.PopupMenuManager(this);
